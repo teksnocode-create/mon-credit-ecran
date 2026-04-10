@@ -31,7 +31,7 @@ function AppLayout() {
     return <Navigate to="/auth" replace />;
   }
 
-  const pageMap = {
+  const pageMap: Record<'dashboard' | 'stats' | 'profile' | 'rules', React.ReactNode> = {
     dashboard: <Dashboard />,
     stats: <Stats />,
     profile: <Profile />,
