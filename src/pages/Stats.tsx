@@ -8,9 +8,10 @@ import { themes } from '../themes/themes';
 const DAYS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
 export default function Stats() {
-  const { themeId, children, activeChildId } = useAppStore();
-  const theme = themes[themeId];
+  const { children, activeChildId } = useAppStore();
   const child = children.find(c => c.id === activeChildId);
+  const themeId = child?.themeId ?? 'galactic';
+  const theme = themes[themeId];
 
   if (!child) {
     return (

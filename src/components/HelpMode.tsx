@@ -31,8 +31,9 @@ const steps = [
 ];
 
 export default function HelpMode() {
-  const { helpModeActive, helpStep, setHelpMode, setHelpStep, themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { helpModeActive, helpStep, setHelpMode, setHelpStep, children, activeChildId } = useAppStore();
+  const child = children.find(c => c.id === activeChildId);
+  const theme = child ? themes[child.themeId] : themes['galactic'];
 
   if (!helpModeActive) return null;
 

@@ -5,27 +5,79 @@ import { themes } from '../themes/themes';
 import CircularTimer from '../components/CircularTimer';
 import ThemeSwitcher from '../components/ThemeSwitcher';
 import HelpMode from '../components/HelpMode';
+import MalusConfirmModal from '../components/MalusConfirmModal';
 
 const AVATARS = ['🦊', '🐸', '🦁', '🐼', '🦄', '🐉', '🤖', '👾', '🦋', '🌟', '🎯', '🎮'];
 
+function MalusSection({ malus, theme, creditShake, onApply }: {
+  malus: import('../types').Malus[];
+  theme: import('../themes/themes').Theme;
+  creditShake: boolean;
+  onApply: (id: string) => void;
+}) {
+  return (
+    <div className="mb-6">
+      <h2 className={`text-lg font-black ${theme.text} mb-3`}>Malus 🚫</h2>
+      <motion.p
+        className={`text-xs ${theme.textMuted} mb-3 italic`}
+        animate={creditShake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
+        transition={{ duration: 0.4 }}
+      >
+        ⚠️ Réservé aux parents — retire des crédits à l'enfant
+      </motion.p>
+      <div className="space-y-2">
+        {malus.map((m, i) => (
+          <motion.div
+            key={m.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{m.icon}</span>
+              <div>
+                <div className={`font-bold ${theme.text} text-sm`}>{m.title}</div>
+                <div className={`text-xs ${theme.textMuted}`}>{m.description}</div>
+              </div>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.85 }}
+              onClick={() => onApply(m.id)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-xl font-black text-xs btn-3d bg-red-500 hover:bg-red-400 text-white"
+            >
+              -{m.creditPenalty} 🪙
+            </motion.button>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const {
-    themeId, children, activeChildId, setActiveChild,
-    isTimerRunning, startTimer, pauseTimer, tickTimer,
-    missions, rewards, completeMission, convertCreditsToStars, redeemReward,
+    children, activeChildId, setActiveChild,
+    startTimer, pauseTimer, tickTimer,
+    missions, malus, rewards, completeMission, convertCreditsToStars, redeemReward, applyMalus,
     setHelpMode, settings,
   } = useAppStore();
-  const theme = themes[themeId];
 
   const child = children.find(c => c.id === activeChildId);
+  const theme = child ? themes[child.themeId] : themes['galactic'];
+  const isTimerRunning = child?.isTimerRunning ?? false;
   const [completedMissions, setCompletedMissions] = useState<string[]>([]);
+  const [malusOpen, setMalusOpen] = useState(false);
+  const [pendingMalusId, setPendingMalusId] = useState<string | null>(null);
+  const [creditShake, setCreditShake] = useState(false);
 
-  // Timer tick
+  // Timer tick — runs as long as any child has a running timer
+  const anyRunning = children.some(c => c.isTimerRunning);
   useEffect(() => {
-    if (!isTimerRunning) return;
+    if (!anyRunning) return;
     const interval = setInterval(() => tickTimer(), 1000);
     return () => clearInterval(interval);
-  }, [isTimerRunning, tickTimer]);
+  }, [anyRunning, tickTimer]);
 
   // Reset completed missions at midnight
   useEffect(() => {
@@ -67,7 +119,7 @@ export default function Dashboard() {
             <div>
               <div className={`font-black ${theme.text} text-base leading-tight`}>{child.name}</div>
               <div className={`text-xs ${theme.textMuted}`}>
-                {isTimerRunning ? '🟢 En cours' : '⏸️ En pause'}
+                {isTimerRunning ? '🟢 En cours' : child.remainingMinutes <= 0 ? '🔴 Terminé' : '⏸️ En pause'}
               </div>
             </div>
           </div>
@@ -101,6 +153,7 @@ export default function Dashboard() {
               >
                 <span>{AVATARS.includes(c.avatarId) ? c.avatarId : '🦊'}</span>
                 <span>{c.name}</span>
+                {c.isTimerRunning && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
               </motion.button>
             ))}
           </div>
@@ -131,27 +184,35 @@ export default function Dashboard() {
             >
               {isTimerRunning ? '⏸️' : '▶️'}
             </motion.span>
-            {isTimerRunning ? 'Pause' : child.remainingMinutes <= 0 ? 'Temps écoulé' : 'Jouer !'}
+            {isTimerRunning ? 'Pause' : child.remainingMinutes <= 0 ? 'Temps écoulé' : "C'est parti !"}
           </motion.button>
         </div>
 
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { icon: '🪙', value: Math.floor(child.credits), label: 'Crédits' },
+            { icon: '🪙', value: Math.floor(child.credits), label: 'Crédits', isCredits: true },
             { icon: '⭐', value: child.stars, label: 'Étoiles' },
             { icon: '⏰', value: `${child.dailyLimitMinutes}m`, label: 'Limite' },
-          ].map(stat => (
-            <motion.div
-              key={stat.label}
-              whileHover={{ scale: 1.03 }}
-              className={`${theme.card} rounded-2xl p-3 text-center`}
-            >
-              <div className="text-2xl">{stat.icon}</div>
-              <div className={`text-xl font-black ${theme.text}`}>{stat.value}</div>
-              <div className={`text-xs ${theme.textMuted}`}>{stat.label}</div>
-            </motion.div>
-          ))}
+          ].map(stat => {
+            const isNegative = stat.isCredits && stat.value < 0;
+            const displayValue = stat.isCredits
+              ? (isNegative ? `−${Math.abs(stat.value)}` : stat.value)
+              : stat.value;
+            return (
+              <motion.div
+                key={stat.label}
+                whileHover={{ scale: 1.03 }}
+                className={`${theme.card} rounded-2xl p-3 text-center ${isNegative ? 'bg-red-500/20 border border-red-500/40' : ''}`}
+              >
+                <div className="text-2xl">{stat.icon}</div>
+                <div className={`text-xl font-black ${isNegative ? 'text-red-400' : theme.text}`}>
+                  {displayValue}
+                </div>
+                <div className={`text-xs ${theme.textMuted}`}>{stat.label}</div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Convert button */}
@@ -256,9 +317,34 @@ export default function Dashboard() {
             })}
           </div>
         </div>
+        {/* Malus */}
+        {malus.filter(m => m.enabled).length > 0 && (
+          <MalusSection
+            malus={malus.filter(m => m.enabled)}
+            theme={theme}
+            creditShake={creditShake}
+            onApply={(id) => { setPendingMalusId(id); setMalusOpen(true); }}
+          />
+        )}
       </div>
 
       <HelpMode />
+
+      <MalusConfirmModal
+        open={malusOpen}
+        malusItem={malus.find(m => m.id === pendingMalusId) ?? null}
+        onConfirm={() => {
+          if (pendingMalusId) {
+            applyMalus(pendingMalusId);
+            setCreditShake(true);
+            setTimeout(() => setCreditShake(false), 600);
+          }
+          setMalusOpen(false);
+          setPendingMalusId(null);
+        }}
+        onCancel={() => { setMalusOpen(false); setPendingMalusId(null); }}
+        theme={theme}
+      />
     </div>
   );
 }

@@ -6,8 +6,8 @@ import { themes } from '../themes/themes';
 const AVATARS = ['🦊', '🐸', '🦁', '🐼', '🦄', '🐉', '🤖', '👾', '🦋', '🌟', '🎯', '🎮'];
 
 export default function OnboardingModal() {
-  const { themeId, addChild, completeOnboarding } = useAppStore();
-  const theme = themes[themeId];
+  const { uiThemeId, addChild, completeOnboarding } = useAppStore();
+  const theme = themes[uiThemeId];
 
   const [step, setStep] = useState(0);
   const [childName, setChildName] = useState('');

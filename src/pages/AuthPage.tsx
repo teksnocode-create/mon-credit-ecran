@@ -6,8 +6,8 @@ import { themes } from '../themes/themes';
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { login, register, themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { login, register, uiThemeId } = useAppStore();
+  const theme = themes[uiThemeId ?? 'galactic'] || themes['galactic'];
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -164,9 +164,9 @@ export default function AuthPage() {
               </motion.button>
 
               <div className="flex items-center gap-3 my-2">
-                <div className={`flex-1 h-px ${themeId === 'candy' ? 'bg-gray-200' : 'bg-white/20'}`} />
+                <div className={`flex-1 h-px ${uiThemeId === 'candy' ? 'bg-gray-200' : 'bg-white/20'}`} />
                 <span className={`text-xs ${theme.textMuted} font-semibold`}>ou</span>
-                <div className={`flex-1 h-px ${themeId === 'candy' ? 'bg-gray-200' : 'bg-white/20'}`} />
+                <div className={`flex-1 h-px ${uiThemeId === 'candy' ? 'bg-gray-200' : 'bg-white/20'}`} />
               </div>
 
               <motion.button

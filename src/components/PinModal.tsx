@@ -9,8 +9,9 @@ interface Props {
 }
 
 export default function PinModal({ onSuccess, onClose }: Props) {
-  const { settings, themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { settings, children, activeChildId } = useAppStore();
+  const child = children.find(c => c.id === activeChildId);
+  const theme = child ? themes[child.themeId] : themes['galactic'];
   const [input, setInput] = useState('');
   const [shake, setShake] = useState(false);
 

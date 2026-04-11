@@ -4,8 +4,9 @@ import { useAppStore } from '../store/appStore';
 import { themes } from '../themes/themes';
 
 export default function ConfettiEffect() {
-  const { showConfetti, themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { showConfetti, children, activeChildId } = useAppStore();
+  const child = children.find(c => c.id === activeChildId);
+  const theme = child ? themes[child.themeId] : themes['galactic'];
 
   useEffect(() => {
     if (!showConfetti) return;

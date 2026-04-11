@@ -8,8 +8,9 @@ interface Props {
 }
 
 export default function CircularTimer({ remainingMinutes, dailyLimitMinutes }: Props) {
-  const { themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { children, activeChildId } = useAppStore();
+  const child = children.find(c => c.id === activeChildId);
+  const theme = child ? themes[child.themeId] : themes['galactic'];
 
   const size = 240;
   const stroke = 14;

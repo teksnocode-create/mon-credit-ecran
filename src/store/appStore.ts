@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppState, ChildProfile, Mission, Reward, ParentalSettings } from '../types';
+import { AppState, ChildProfile, Mission, Malus, Reward, ParentalSettings } from '../types';
 
 const defaultMissions: Mission[] = [
   { id: 'm1', title: 'Devoirs', icon: '📚', creditValue: 10, description: 'Faire ses devoirs du soir', enabled: true },
@@ -9,6 +9,14 @@ const defaultMissions: Mission[] = [
   { id: 'm4', title: 'Chambre rangée', icon: '🏠', creditValue: 5, description: 'Ranger sa chambre', enabled: true },
   { id: 'm5', title: 'Aide à la maison', icon: '🍽️', creditValue: 7, description: 'Aider aux tâches ménagères', enabled: true },
   { id: 'm6', title: 'Méditation', icon: '🧘', creditValue: 5, description: '10 minutes de calme', enabled: true },
+];
+
+const defaultMalus: Malus[] = [
+  { id: 'mal1', title: 'Mensonge', icon: '🤥', creditPenalty: 5, description: 'A menti', enabled: true },
+  { id: 'mal2', title: 'Caprice', icon: '😤', creditPenalty: 8, description: 'Crise ou caprice', enabled: true },
+  { id: 'mal3', title: 'Impoli', icon: '🗣️', creditPenalty: 5, description: 'Manque de politesse', enabled: true },
+  { id: 'mal4', title: 'Chambre non rangée', icon: '🧹', creditPenalty: 3, description: "N'a pas rangé sa chambre", enabled: true },
+  { id: 'mal5', title: 'Écran sans permission', icon: '📵', creditPenalty: 10, description: "A utilisé l'écran sans autorisation", enabled: true },
 ];
 
 const defaultRewards: Reward[] = [
@@ -39,8 +47,9 @@ interface StoreActions {
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   completeOnboarding: () => void;
-  setTheme: (themeId: 'galactic' | 'candy' | 'eco') => void;
-  addChild: (name: string, avatarId: string, dailyLimitMinutes: number) => void;
+  setUITheme: (themeId: 'galactic' | 'candy' | 'eco') => void;
+  addChild: (name: string, avatarId: string, dailyLimitMinutes: number, themeId?: 'galactic' | 'candy' | 'eco') => void;
+  setChildTheme: (childId: string, themeId: 'galactic' | 'candy' | 'eco') => void;
   setActiveChild: (id: string) => void;
   updateChild: (id: string, updates: Partial<ChildProfile>) => void;
   startTimer: () => void;
@@ -50,9 +59,14 @@ interface StoreActions {
   completeMission: (missionId: string) => void;
   convertCreditsToStars: () => void;
   redeemReward: (rewardId: string) => void;
+  deleteChild: (id: string) => void;
   addMission: (mission: Omit<Mission, 'id'>) => void;
   updateMission: (id: string, updates: Partial<Mission>) => void;
   deleteMission: (id: string) => void;
+  applyMalus: (malusId: string) => void;
+  addMalus: (m: Omit<Malus, 'id'>) => void;
+  updateMalus: (id: string, updates: Partial<Malus>) => void;
+  deleteMalus: (id: string) => void;
   addReward: (reward: Omit<Reward, 'id'>) => void;
   updateReward: (id: string, updates: Partial<Reward>) => void;
   deleteReward: (id: string) => void;
@@ -72,12 +86,11 @@ export const useAppStore = create<AppState & StoreActions>()(
       user: null,
       isAuthenticated: false,
       hasCompletedOnboarding: false,
-      themeId: 'galactic',
+      uiThemeId: 'galactic',
       children: [],
       activeChildId: null,
-      isTimerRunning: false,
-      timerStartedAt: null,
       missions: defaultMissions,
+      malus: defaultMalus,
       rewards: defaultRewards,
       settings: defaultSettings,
       helpModeActive: false,
@@ -107,22 +120,24 @@ export const useAppStore = create<AppState & StoreActions>()(
         return true;
       },
 
-      logout: () => set({ user: null, isAuthenticated: false, isTimerRunning: false, children: [], activeChildId: null, hasCompletedOnboarding: false }),
+      logout: () => set({ user: null, isAuthenticated: false, children: [], activeChildId: null, hasCompletedOnboarding: false }),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 
-      setTheme: (themeId) => set({ themeId }),
+      setUITheme: (themeId) => set({ uiThemeId: themeId }),
 
-      addChild: (name, avatarId, dailyLimitMinutes) => {
+      addChild: (name, avatarId, dailyLimitMinutes, themeId = 'galactic') => {
         const child: ChildProfile = {
           id: `child_${Date.now()}`,
-          name, avatarId,
+          name, avatarId, themeId,
           credits: 0, stars: 0,
           remainingMinutes: dailyLimitMinutes,
           dailyLimitMinutes,
           totalMinutesUsedToday: 0,
           lastResetDate: today(),
           usageHistory: [],
+          isTimerRunning: false,
+          timerStartedAt: null,
         };
         set(state => ({
           children: [...state.children, child],
@@ -130,17 +145,29 @@ export const useAppStore = create<AppState & StoreActions>()(
         }));
       },
 
-      setActiveChild: (id) => set({ activeChildId: id, isTimerRunning: false }),
+      setChildTheme: (childId, themeId) => set(state => ({
+        children: state.children.map(c => c.id === childId ? { ...c, themeId } : c),
+      })),
+
+      setActiveChild: (id) => set({ activeChildId: id }),
 
       updateChild: (id, updates) => set(state => ({
         children: state.children.map(c => c.id === id ? { ...c, ...updates } : c),
       })),
+
+      deleteChild: (id) => set(state => {
+        if (state.children.length <= 1) return {};
+        const remaining = state.children.filter(c => c.id !== id);
+        const newActiveId = state.activeChildId === id ? remaining[0].id : state.activeChildId;
+        return { children: remaining, activeChildId: newActiveId };
+      }),
 
       startTimer: () => {
         const { activeChildId, children } = get();
         const child = children.find(c => c.id === activeChildId);
         if (!child || child.remainingMinutes <= 0) return;
 
+        // Daily reset check
         if (child.lastResetDate !== today()) {
           const history = [...(child.usageHistory || []), { date: child.lastResetDate, minutes: child.totalMinutesUsedToday }].slice(-30);
           get().updateChild(activeChildId!, {
@@ -151,46 +178,52 @@ export const useAppStore = create<AppState & StoreActions>()(
           });
         }
 
-        set({ isTimerRunning: true, timerStartedAt: Date.now() });
+        get().updateChild(activeChildId!, { isTimerRunning: true, timerStartedAt: Date.now() });
       },
 
       pauseTimer: () => {
-        const { timerStartedAt, activeChildId, children } = get();
-        if (!timerStartedAt || !activeChildId) { set({ isTimerRunning: false, timerStartedAt: null }); return; }
-
-        const elapsedSeconds = (Date.now() - timerStartedAt) / 1000;
-        const elapsedMinutes = elapsedSeconds / 60;
+        const { activeChildId, children } = get();
+        if (!activeChildId) return;
         const child = children.find(c => c.id === activeChildId);
-        if (child) {
-          const newRemaining = Math.max(0, child.remainingMinutes - elapsedMinutes);
-          const newUsed = child.totalMinutesUsedToday + elapsedMinutes;
-          get().updateChild(activeChildId, { remainingMinutes: newRemaining, totalMinutesUsedToday: newUsed });
+        if (!child || !child.timerStartedAt) {
+          get().updateChild(activeChildId, { isTimerRunning: false, timerStartedAt: null });
+          return;
         }
-        set({ isTimerRunning: false, timerStartedAt: null });
+        const elapsed = (Date.now() - child.timerStartedAt) / 1000 / 60;
+        const newRemaining = Math.max(0, child.remainingMinutes - elapsed);
+        const newUsed = child.totalMinutesUsedToday + elapsed;
+        get().updateChild(activeChildId, {
+          isTimerRunning: false,
+          timerStartedAt: null,
+          remainingMinutes: newRemaining,
+          totalMinutesUsedToday: newUsed,
+        });
       },
 
       tickTimer: () => {
-        const { timerStartedAt, activeChildId, children, isTimerRunning } = get();
-        if (!isTimerRunning || !timerStartedAt || !activeChildId) return;
-
-        const child = children.find(c => c.id === activeChildId);
-        if (!child) return;
-
-        const elapsedSeconds = (Date.now() - timerStartedAt) / 1000;
-        const elapsedMinutes = elapsedSeconds / 60;
-        const baseRemaining = child.dailyLimitMinutes - child.totalMinutesUsedToday;
-        const currentRemaining = Math.max(0, baseRemaining - elapsedMinutes);
+        const { children } = get();
+        const running = children.filter(c => c.isTimerRunning && c.timerStartedAt);
+        if (running.length === 0) return;
 
         set(state => ({
-          children: state.children.map(c => c.id === activeChildId
-            ? { ...c, remainingMinutes: currentRemaining }
-            : c
-          )
+          children: state.children.map(c => {
+            if (!c.isTimerRunning || !c.timerStartedAt) return c;
+            const elapsed = (Date.now() - c.timerStartedAt) / 1000 / 60;
+            const base = c.dailyLimitMinutes - c.totalMinutesUsedToday;
+            const remaining = Math.max(0, base - elapsed);
+            if (remaining <= 0) {
+              // Time's up — commit and stop
+              return {
+                ...c,
+                remainingMinutes: 0,
+                totalMinutesUsedToday: c.totalMinutesUsedToday + (c.dailyLimitMinutes - c.totalMinutesUsedToday),
+                isTimerRunning: false,
+                timerStartedAt: null,
+              };
+            }
+            return { ...c, remainingMinutes: remaining };
+          }),
         }));
-
-        if (currentRemaining <= 0) {
-          get().pauseTimer();
-        }
       },
 
       resetDailyTimer: () => {
@@ -255,6 +288,25 @@ export const useAppStore = create<AppState & StoreActions>()(
         missions: state.missions.filter(m => m.id !== id)
       })),
 
+      applyMalus: (malusId) => {
+        const { activeChildId, malus } = get();
+        if (!activeChildId) return;
+        const m = malus.find(x => x.id === malusId);
+        if (!m) return;
+        const child = get().children.find(c => c.id === activeChildId);
+        if (!child) return;
+        get().updateChild(activeChildId, { credits: child.credits - m.creditPenalty });
+      },
+      addMalus: (m) => set(state => ({
+        malus: [...state.malus, { ...m, id: `mal_${Date.now()}` }]
+      })),
+      updateMalus: (id, updates) => set(state => ({
+        malus: state.malus.map(m => m.id === id ? { ...m, ...updates } : m)
+      })),
+      deleteMalus: (id) => set(state => ({
+        malus: state.malus.filter(m => m.id !== id)
+      })),
+
       addReward: (reward) => set(state => ({
         rewards: [...state.rewards, { ...reward, id: `r_${Date.now()}` }]
       })),
@@ -285,13 +337,27 @@ export const useAppStore = create<AppState & StoreActions>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
-        themeId: state.themeId,
+        uiThemeId: state.uiThemeId,
         children: state.children,
         activeChildId: state.activeChildId,
         missions: state.missions,
+        malus: state.malus,
         rewards: state.rewards,
         settings: state.settings,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Migration: ensure all children have themeId
+        if (state && state.children) {
+          state.children = state.children.map(c => ({
+            ...c,
+            themeId: c.themeId || 'galactic',
+          }));
+        }
+        // Ensure uiThemeId exists
+        if (!state?.uiThemeId) {
+          state.uiThemeId = 'galactic';
+        }
+      },
     }
   )
 );

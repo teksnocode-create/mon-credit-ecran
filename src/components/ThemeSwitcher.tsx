@@ -5,7 +5,9 @@ import { themes } from '../themes/themes';
 
 export default function ThemeSwitcher() {
   const [open, setOpen] = useState(false);
-  const { themeId, setTheme } = useAppStore();
+  const { children, activeChildId, setChildTheme } = useAppStore();
+  const child = children.find(c => c.id === activeChildId);
+  const themeId = child?.themeId ?? 'galactic';
   const theme = themes[themeId];
 
   return (
@@ -33,7 +35,7 @@ export default function ThemeSwitcher() {
                 key={t.id}
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => { setTheme(t.id as 'galactic' | 'candy' | 'eco'); setOpen(false); }}
+                onClick={() => { child && setChildTheme(child.id, t.id as 'galactic' | 'candy' | 'eco'); setOpen(false); }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
                   themeId === t.id
                     ? `${theme.accentClass} text-white`

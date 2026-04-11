@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useAppStore } from './store/appStore';
@@ -16,16 +15,9 @@ import ConfettiEffect from './components/ConfettiEffect';
 function AppLayout() {
   const {
     isAuthenticated, hasCompletedOnboarding,
-    themeId, currentPage, tickTimer, isTimerRunning,
+    uiThemeId, currentPage,
   } = useAppStore();
-  const theme = themes[themeId];
-
-  // Tick timer every second
-  useEffect(() => {
-    if (!isTimerRunning) return;
-    const interval = setInterval(() => tickTimer(), 1000);
-    return () => clearInterval(interval);
-  }, [isTimerRunning, tickTimer]);
+  const theme = themes[uiThemeId ?? 'galactic'] || themes['galactic'];
 
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
@@ -53,8 +45,8 @@ function AppLayout() {
 }
 
 export default function App() {
-  const { themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { uiThemeId } = useAppStore();
+  const theme = themes[uiThemeId ?? 'galactic'] || themes['galactic'];
 
   return (
     <BrowserRouter>

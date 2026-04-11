@@ -10,8 +10,9 @@ const tabs = [
 ];
 
 export default function BottomNav() {
-  const { currentPage, setPage, themeId } = useAppStore();
-  const theme = themes[themeId];
+  const { currentPage, setPage, children, activeChildId } = useAppStore();
+  const child = children.find(c => c.id === activeChildId);
+  const theme = child ? themes[child.themeId] : themes['galactic'];
 
   return (
     <nav className={`fixed bottom-0 left-0 right-0 ${theme.nav} z-40`}>

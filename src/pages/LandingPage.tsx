@@ -320,7 +320,7 @@ export default function LandingPage() {
         >
           <div className="text-5xl mb-4">🚀</div>
           <h2 className="text-3xl font-black text-white mb-3">Prêt à transformer l'ambiance à la maison ?</h2>
-          <p className="text-white/70 mb-8">Gratuit, sans publicité, sans abonnement. Juste une meilleure famille.</p>
+          <p className="text-white/70 mb-8">Gratuit, sans publicité, sans abonnement.</p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
