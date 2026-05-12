@@ -67,7 +67,7 @@ export default function AuthPage() {
           {/* Logo */}
           <div className="text-center mb-6">
             <div className="text-5xl mb-2">📱</div>
-            <h1 className={`text-2xl font-black ${theme.text}`}>Mon Crédit Écran</h1>
+            <h1 className={`text-2xl font-black ${theme.text}`}>Silteplay</h1>
             <p className={`text-sm ${theme.textMuted} mt-1`}>
               {mode === 'login' ? 'Bon retour !' : 'Créez votre compte famille'}
             </p>

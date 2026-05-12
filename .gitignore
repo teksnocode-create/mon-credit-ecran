@@ -30,3 +30,6 @@ next-env.d.ts
 
 # Apple Double files (external drive heritage)
 ._*
+
+# Local skills symlink (personal)
+skills-core

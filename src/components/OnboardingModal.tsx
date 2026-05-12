@@ -24,7 +24,7 @@ export default function OnboardingModal() {
   const slides = [
     {
       emoji: '🎉',
-      title: 'Bienvenue sur Mon Crédit Écran !',
+      title: 'Bienvenue sur Silteplay !',
       subtitle: 'L\'application qui transforme le temps d\'écran en aventure positive.',
       content: (
         <div className="space-y-3">

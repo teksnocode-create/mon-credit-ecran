@@ -5,6 +5,36 @@ export interface User {
   avatarId: string;
 }
 
+export interface ClaimedReward {
+  id: string;
+  rewardId: string;
+  title: string;
+  icon: string;
+  claimedAt: string;
+}
+
+export type ActivityType =
+  | 'mission'
+  | 'malus_credits'
+  | 'malus_minutes'
+  | 'convert'
+  | 'reward_minutes'
+  | 'reward_item'
+  | 'reward_fulfilled'
+  | 'time_adjust'
+  | 'streak';
+
+export interface ActivityEntry {
+  id: string;
+  type: ActivityType;
+  label: string;
+  icon: string;
+  timestamp: string;
+  color: 'green' | 'red' | 'gold' | 'neutral';
+}
+
+export type WeekdayLimits = { 0: number; 1: number; 2: number; 3: number; 4: number; 5: number; 6: number };
+
 export interface ChildProfile {
   id: string;
   name: string;
@@ -14,11 +44,19 @@ export interface ChildProfile {
   stars: number;
   remainingMinutes: number;
   dailyLimitMinutes: number;
+  weekdayLimits: WeekdayLimits;
   totalMinutesUsedToday: number;
   lastResetDate: string;
   usageHistory: { date: string; minutes: number }[];
   isTimerRunning: boolean;
   timerStartedAt: number | null;
+  completedMissionIds: string[];
+  claimedRewards: ClaimedReward[];
+  weeklyAdjustment: number;
+  weekStartDate: string | null;
+  activityLog: ActivityEntry[];
+  streakCount: number;
+  lastStreakDate: string | null;
 }
 
 export interface Mission {
@@ -35,6 +73,7 @@ export interface Malus {
   title: string;
   icon: string;
   creditPenalty: number;
+  minutesPenalty: number;
   description: string;
   enabled: boolean;
 }
@@ -54,13 +93,10 @@ export interface ParentalSettings {
   pin: string;
   creditToStarRatio: number;
   starToMinutesRatio: number;
-  schoolModeEnabled: boolean;
-  schoolModeLimit: number;
-  vacationModeEnabled: boolean;
-  vacationModeLimit: number;
   curfewEnabled: boolean;
   curfewTime: string;
   alertSound: 'chime' | 'fanfare' | 'bell' | 'none';
+  soundsEnabled: boolean;
   weekdayLimits: { [key: number]: number };
 }
 

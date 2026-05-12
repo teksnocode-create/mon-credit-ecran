@@ -1,11 +1,18 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { themes } from '../themes/themes';
+import { requestNotificationPermission } from '../lib/notify';
+import { FlyingNumberLayer, FlyAnchor } from '../components/FlyingNumber';
 import CircularTimer from '../components/CircularTimer';
 import ThemeSwitcher from '../components/ThemeSwitcher';
 import HelpMode from '../components/HelpMode';
 import MalusConfirmModal from '../components/MalusConfirmModal';
+import TimerAdjustModal from '../components/TimerAdjustModal';
+import ClaimedRewardsList from '../components/ClaimedRewardsList';
+import WeeklyQuotaCard from '../components/WeeklyQuotaCard';
+import ActivityLog from '../components/ActivityLog';
 
 const AVATARS = ['🦊', '🐸', '🦁', '🐼', '🦄', '🐉', '🤖', '👾', '🦋', '🌟', '🎯', '🎮'];
 
@@ -13,7 +20,7 @@ function MalusSection({ malus, theme, creditShake, onApply }: {
   malus: import('../types').Malus[];
   theme: import('../themes/themes').Theme;
   creditShake: boolean;
-  onApply: (id: string) => void;
+  onApply: (id: string, mode: 'credits' | 'minutes') => void;
 }) {
   return (
     <div className="mb-6">
@@ -23,7 +30,7 @@ function MalusSection({ malus, theme, creditShake, onApply }: {
         animate={creditShake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
         transition={{ duration: 0.4 }}
       >
-        ⚠️ Réservé aux parents — retire des crédits à l'enfant
+        ⚠️ Réservé aux parents — choisis crédits ou minutes selon la situation
       </motion.p>
       <div className="space-y-2">
         {malus.map((m, i) => (
@@ -32,22 +39,35 @@ function MalusSection({ malus, theme, creditShake, onApply }: {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 flex items-center justify-between"
+            className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3 flex items-center justify-between gap-2"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{m.icon}</span>
-              <div>
-                <div className={`font-bold ${theme.text} text-sm`}>{m.title}</div>
-                <div className={`text-xs ${theme.textMuted}`}>{m.description}</div>
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <span className="text-2xl flex-shrink-0">{m.icon}</span>
+              <div className="min-w-0">
+                <div className={`font-bold ${theme.text} text-sm truncate`}>{m.title}</div>
+                <div className={`text-xs ${theme.textMuted} truncate`}>{m.description}</div>
               </div>
             </div>
-            <motion.button
-              whileTap={{ scale: 0.85 }}
-              onClick={() => onApply(m.id)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-xl font-black text-xs btn-3d bg-red-500 hover:bg-red-400 text-white"
-            >
-              -{m.creditPenalty} 🪙
-            </motion.button>
+            <div className="flex gap-1.5 flex-shrink-0">
+              {m.creditPenalty > 0 && (
+                <motion.button
+                  whileTap={{ scale: 0.85 }}
+                  onClick={() => onApply(m.id, 'credits')}
+                  className="px-2.5 py-1.5 rounded-xl font-black text-xs btn-3d bg-red-500 hover:bg-red-400 text-white"
+                >
+                  −{m.creditPenalty} 🪙
+                </motion.button>
+              )}
+              {m.minutesPenalty > 0 && (
+                <motion.button
+                  whileTap={{ scale: 0.85 }}
+                  onClick={() => onApply(m.id, 'minutes')}
+                  className="px-2.5 py-1.5 rounded-xl font-black text-xs btn-3d bg-red-600 hover:bg-red-500 text-white"
+                >
+                  −{m.minutesPenalty} min
+                </motion.button>
+              )}
+            </div>
           </motion.div>
         ))}
       </div>
@@ -58,7 +78,7 @@ function MalusSection({ malus, theme, creditShake, onApply }: {
 export default function Dashboard() {
   const {
     children, activeChildId, setActiveChild,
-    startTimer, pauseTimer, tickTimer,
+    startTimer, pauseTimer, tickTimer, checkCurfew, ensureDailyReset,
     missions, malus, rewards, completeMission, convertCreditsToStars, redeemReward, applyMalus,
     setHelpMode, settings,
   } = useAppStore();
@@ -66,28 +86,31 @@ export default function Dashboard() {
   const child = children.find(c => c.id === activeChildId);
   const theme = child ? themes[child.themeId] : themes['galactic'];
   const isTimerRunning = child?.isTimerRunning ?? false;
-  const [completedMissions, setCompletedMissions] = useState<string[]>([]);
+  const completedMissions = child?.completedMissionIds ?? [];
+  const navigate = useNavigate();
   const [malusOpen, setMalusOpen] = useState(false);
   const [pendingMalusId, setPendingMalusId] = useState<string | null>(null);
+  const [pendingMalusMode, setPendingMalusMode] = useState<'credits' | 'minutes'>('credits');
   const [creditShake, setCreditShake] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
 
-  // Timer tick — runs as long as any child has a running timer
+  // Request notification permission once on mount
+  useEffect(() => { requestNotificationPermission(); }, []);
+
+  // Timer tick + curfew check + daily reset guard every second
   const anyRunning = children.some(c => c.isTimerRunning);
   useEffect(() => {
-    if (!anyRunning) return;
-    const interval = setInterval(() => tickTimer(), 1000);
+    const interval = setInterval(() => {
+      if (anyRunning) tickTimer();
+      checkCurfew();
+      ensureDailyReset();
+    }, 1000);
     return () => clearInterval(interval);
-  }, [anyRunning, tickTimer]);
-
-  // Reset completed missions at midnight
-  useEffect(() => {
-    setCompletedMissions([]);
-  }, [activeChildId]);
+  }, [anyRunning, tickTimer, checkCurfew, ensureDailyReset]);
 
   const handleMissionComplete = (missionId: string) => {
     if (completedMissions.includes(missionId)) return;
     completeMission(missionId);
-    setCompletedMissions(prev => [...prev, missionId]);
   };
 
   const canRedeem = (starCost: number) => (child?.stars ?? 0) >= starCost;
@@ -117,7 +140,17 @@ export default function Dashboard() {
               {avatarEmoji}
             </div>
             <div>
-              <div className={`font-black ${theme.text} text-base leading-tight`}>{child.name}</div>
+              <div className={`font-black ${theme.text} text-base leading-tight flex items-center gap-1.5`}>
+                {child.name}
+                {(child.streakCount ?? 0) > 0 && (
+                  <span
+                    className="text-xs font-black px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-500"
+                    title={`Série de ${child.streakCount} jour${child.streakCount > 1 ? 's' : ''}`}
+                  >
+                    🔥 {child.streakCount}
+                  </span>
+                )}
+              </div>
               <div className={`text-xs ${theme.textMuted}`}>
                 {isTimerRunning ? '🟢 En cours' : child.remainingMinutes <= 0 ? '🔴 Terminé' : '⏸️ En pause'}
               </div>
@@ -160,11 +193,13 @@ export default function Dashboard() {
         )}
 
         {/* Timer */}
-        <div className="flex justify-center my-4">
+        <div className="relative flex justify-center my-4">
           <CircularTimer
             remainingMinutes={child.remainingMinutes}
             dailyLimitMinutes={child.dailyLimitMinutes}
           />
+          <FlyingNumberLayer anchor="timer" />
+          <FlyingNumberLayer anchor="minutes" />
         </div>
 
         {/* Play/Pause button */}
@@ -188,31 +223,65 @@ export default function Dashboard() {
           </motion.button>
         </div>
 
+        {/* Claimed (non-minutes) rewards waiting */}
+        <div className="mb-4">
+          <ClaimedRewardsList />
+        </div>
+
+        {/* Show mode + Adjust entries */}
+        <div className="flex justify-center gap-2 mb-6">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/show')}
+            className={`text-sm font-bold ${theme.textMuted} ${theme.card} px-4 py-2 rounded-full`}
+          >
+            📺 Montrer à l'enfant
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setAdjustOpen(true)}
+            className={`text-sm font-bold ${theme.textMuted} ${theme.card} px-4 py-2 rounded-full`}
+          >
+            ⏱️ Ajuster
+          </motion.button>
+        </div>
+
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { icon: '🪙', value: Math.floor(child.credits), label: 'Crédits', isCredits: true },
-            { icon: '⭐', value: child.stars, label: 'Étoiles' },
-            { icon: '⏰', value: `${child.dailyLimitMinutes}m`, label: 'Limite' },
+            { icon: '🪙', value: Math.floor(child.credits), label: 'Crédits', isCredits: true, anchor: 'credits' as FlyAnchor },
+            { icon: '⭐', value: child.stars, label: 'Étoiles', anchor: 'stars' as FlyAnchor },
+            { icon: '⏰', value: `${child.dailyLimitMinutes}m`, label: 'Limite', anchor: null },
           ].map(stat => {
-            const isNegative = stat.isCredits && stat.value < 0;
+            const isNegative = stat.isCredits && (stat.value as number) < 0;
             const displayValue = stat.isCredits
-              ? (isNegative ? `−${Math.abs(stat.value)}` : stat.value)
+              ? (isNegative ? `−${Math.abs(stat.value as number)}` : stat.value)
               : stat.value;
             return (
               <motion.div
                 key={stat.label}
                 whileHover={{ scale: 1.03 }}
-                className={`${theme.card} rounded-2xl p-3 text-center ${isNegative ? 'bg-red-500/20 border border-red-500/40' : ''}`}
+                className={`relative ${theme.card} rounded-2xl p-3 text-center ${isNegative ? 'bg-red-500/20 border border-red-500/40' : ''}`}
               >
                 <div className="text-2xl">{stat.icon}</div>
                 <div className={`text-xl font-black ${isNegative ? 'text-red-400' : theme.text}`}>
                   {displayValue}
                 </div>
                 <div className={`text-xs ${theme.textMuted}`}>{stat.label}</div>
+                {stat.anchor && <FlyingNumberLayer anchor={stat.anchor} />}
               </motion.div>
             );
           })}
+        </div>
+
+        {/* Weekly quota */}
+        <div className="mb-6">
+          <WeeklyQuotaCard />
+        </div>
+
+        {/* Activity log today */}
+        <div className="mb-6">
+          <ActivityLog />
         </div>
 
         {/* Convert button */}
@@ -225,9 +294,9 @@ export default function Dashboard() {
               whileTap={{ scale: 0.95 }}
               onClick={convertCreditsToStars}
               disabled={!canConvert}
-              className={`w-full mb-4 py-3 rounded-2xl font-bold text-sm text-white btn-3d ${
-                canConvert ? theme.button : 'bg-white/10'
-              } ${!canConvert ? theme.textMuted : ''} disabled:btn-3d`}
+              className={`w-full mb-4 py-3 rounded-2xl font-bold text-sm text-white btn-3d ${theme.button} ${
+                canConvert ? '' : 'opacity-50 cursor-not-allowed'
+              } disabled:btn-3d`}
             >
               {canConvert
                 ? `✨ Convertir ${Math.floor(child.credits / settings.creditToStarRatio)} étoile(s) (${settings.creditToStarRatio} crédits = 1 ⭐)`
@@ -304,10 +373,8 @@ export default function Dashboard() {
                     whileTap={{ scale: 0.85 }}
                     onClick={() => affordable && redeemReward(reward.id)}
                     disabled={!affordable}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-xl font-black text-xs btn-3d ${
-                      affordable
-                        ? `${theme.button} text-white`
-                        : 'bg-white/10 text-white/40 cursor-not-allowed'
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-xl font-black text-xs btn-3d ${theme.button} text-white ${
+                      affordable ? '' : 'opacity-50 cursor-not-allowed'
                     }`}
                   >
                     {reward.starCost} ⭐
@@ -323,7 +390,7 @@ export default function Dashboard() {
             malus={malus.filter(m => m.enabled)}
             theme={theme}
             creditShake={creditShake}
-            onApply={(id) => { setPendingMalusId(id); setMalusOpen(true); }}
+            onApply={(id, mode) => { setPendingMalusId(id); setPendingMalusMode(mode); setMalusOpen(true); }}
           />
         )}
       </div>
@@ -333,11 +400,14 @@ export default function Dashboard() {
       <MalusConfirmModal
         open={malusOpen}
         malusItem={malus.find(m => m.id === pendingMalusId) ?? null}
+        mode={pendingMalusMode}
         onConfirm={() => {
           if (pendingMalusId) {
-            applyMalus(pendingMalusId);
-            setCreditShake(true);
-            setTimeout(() => setCreditShake(false), 600);
+            applyMalus(pendingMalusId, pendingMalusMode);
+            if (pendingMalusMode === 'credits') {
+              setCreditShake(true);
+              setTimeout(() => setCreditShake(false), 600);
+            }
           }
           setMalusOpen(false);
           setPendingMalusId(null);
@@ -345,6 +415,8 @@ export default function Dashboard() {
         onCancel={() => { setMalusOpen(false); setPendingMalusId(null); }}
         theme={theme}
       />
+
+      <TimerAdjustModal open={adjustOpen} onClose={() => setAdjustOpen(false)} />
     </div>
   );
 }

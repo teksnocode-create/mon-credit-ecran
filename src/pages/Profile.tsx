@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { themes } from '../themes/themes';
@@ -8,7 +8,32 @@ const AVATARS = ['🦊', '🐸', '🦁', '🐼', '🦄', '🐉', '🤖', '👾',
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout, children, activeChildId, updateChild, addChild, deleteChild, setActiveChild, setChildTheme } = useAppStore();
+  const { user, logout, children, activeChildId, updateChild, addChild, deleteChild, setActiveChild, setChildTheme, exportData, importData } = useAppStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleExport = () => {
+    const json = exportData();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `silteplay-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const ok = importData(text);
+    setImportMsg({ ok, text: ok ? 'Import réussi ✓' : 'Fichier invalide' });
+    setTimeout(() => setImportMsg(null), 3000);
+    e.target.value = '';
+  };
 
   const child = children.find(c => c.id === activeChildId);
   const theme = child ? themes[child.themeId] : themes['galactic'];
@@ -153,7 +178,7 @@ export default function Profile() {
                     className={`text-sm font-bold py-2 px-3 rounded-xl transition-all ${
                       child?.themeId === t
                         ? `${theme.button} text-white`
-                        : `bg-white/10 ${theme.text}`
+                        : `${theme.buttonSecondary} ${theme.text}`
                     }`}
                   >
                     {t === 'galactic' && '🚀 Galactique'}
@@ -408,6 +433,37 @@ export default function Profile() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Backup */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className={`${theme.card} rounded-3xl p-5 mb-4`}
+        >
+          <h2 className={`font-black ${theme.text} mb-1`}>Sauvegarde</h2>
+          <p className={`text-xs ${theme.textMuted} mb-3`}>Toutes les données sont locales. Exporte-les pour ne rien perdre.</p>
+          <div className="flex gap-2">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleExport}
+              className={`flex-1 py-2.5 rounded-xl font-bold text-sm text-white ${theme.button}`}
+            >
+              Exporter
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleImportClick}
+              className={`flex-1 py-2.5 rounded-xl font-bold text-sm ${theme.buttonSecondary} ${theme.text}`}
+            >
+              Importer
+            </motion.button>
+            <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportFile} />
+          </div>
+          {importMsg && (
+            <p className={`text-xs mt-2 font-bold ${importMsg.ok ? 'text-green-400' : 'text-red-400'}`}>{importMsg.text}</p>
+          )}
+        </motion.div>
 
         {/* App info */}
         <motion.div

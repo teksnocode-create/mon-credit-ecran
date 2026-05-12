@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { useAppStore } from './store/appStore';
 import { themes } from './themes/themes';
 import LandingPage from './pages/LandingPage';
@@ -8,9 +8,16 @@ import Dashboard from './pages/Dashboard';
 import Stats from './pages/Stats';
 import Profile from './pages/Profile';
 import Rules from './pages/Rules';
+import ShowMode from './pages/ShowMode';
 import BottomNav from './components/BottomNav';
 import OnboardingModal from './components/OnboardingModal';
 import ConfettiEffect from './components/ConfettiEffect';
+import { FlyingNumberLayer } from './components/FlyingNumber';
+import RewardCelebration from './components/RewardCelebration';
+import PunishmentFlash from './components/PunishmentFlash';
+import ThemeAmbience from './components/ThemeAmbience';
+import DateTimeHeader from './components/DateTimeHeader';
+import UndoToast from './components/UndoToast';
 
 function AppLayout() {
   const {
@@ -32,12 +39,12 @@ function AppLayout() {
 
   return (
     <div className={`min-h-screen ${theme.bg}`}>
-      <AnimatePresence mode="wait">
-        <div key={currentPage}>
-          {pageMap[currentPage]}
-        </div>
-      </AnimatePresence>
+      <DateTimeHeader />
+      <div key={currentPage}>
+        {pageMap[currentPage]}
+      </div>
       <BottomNav />
+      <UndoToast />
       {isAuthenticated && !hasCompletedOnboarding && <OnboardingModal />}
       <ConfettiEffect />
     </div>
@@ -45,18 +52,36 @@ function AppLayout() {
 }
 
 export default function App() {
-  const { uiThemeId } = useAppStore();
+  const { uiThemeId, restoreSession } = useAppStore();
   const theme = themes[uiThemeId ?? 'galactic'] || themes['galactic'];
+  const [booted, setBooted] = useState(false);
+
+  useEffect(() => {
+    restoreSession().finally(() => setBooted(true));
+  }, [restoreSession]);
+
+  if (!booted) {
+    return (
+      <div className={`${theme.bg} min-h-screen flex items-center justify-center`}>
+        <div className="text-4xl animate-pulse">⏳</div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
-      <div className={`${theme.bg} min-h-screen`}>
+      <div className={`${theme.bg} min-h-screen relative`}>
+        <ThemeAmbience />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/app" element={<AppLayout />} />
+          <Route path="/show" element={<ShowMode />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <FlyingNumberLayer anchor="screen" />
+        <RewardCelebration />
+        <PunishmentFlash />
       </div>
     </BrowserRouter>
   );

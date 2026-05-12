@@ -5,12 +5,13 @@ import { Theme } from '../themes/themes';
 interface Props {
   open: boolean;
   malusItem: Malus | null;
+  mode: 'credits' | 'minutes';
   onConfirm: () => void;
   onCancel: () => void;
   theme: Theme;
 }
 
-export default function MalusConfirmModal({ open, malusItem, onConfirm, onCancel, theme }: Props) {
+export default function MalusConfirmModal({ open, malusItem, mode, onConfirm, onCancel, theme }: Props) {
   return (
     <AnimatePresence>
       {open && malusItem && (
@@ -44,8 +45,17 @@ export default function MalusConfirmModal({ open, malusItem, onConfirm, onCancel
             </div>
 
             <div className="bg-red-500/15 border border-red-500/30 rounded-2xl p-3 text-center mb-5">
-              <span className={`text-2xl font-black text-red-400`}>-{malusItem.creditPenalty} 🪙</span>
-              <p className={`text-xs ${theme.textMuted} mt-1`}>crédits retirés</p>
+              {mode === 'minutes' ? (
+                <>
+                  <span className="text-2xl font-black text-red-400">−{malusItem.minutesPenalty} min</span>
+                  <p className={`text-xs ${theme.textMuted} mt-1`}>de temps d'écran retirées</p>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl font-black text-red-400">−{malusItem.creditPenalty} 🪙</span>
+                  <p className={`text-xs ${theme.textMuted} mt-1`}>crédits retirés</p>
+                </>
+              )}
             </div>
 
             <div className="flex gap-3">
