@@ -58,3 +58,16 @@ Le dossier [skills-core/](skills-core/) contient des skills spécifiques à ce p
 - Pas de tests configurés à ce jour
 - Pas de backend : auth `login`/`register` est simulée dans le store
 - Garder la logique dans le store, les pages/composants restent présentationnels
+
+## Supabase : GRANT obligatoire sur toute nouvelle table (depuis le 30/10/2026)
+Supabase ne donne plus automatiquement l'accès API aux nouvelles tables du schéma `public`. Sans `GRANT`, la table est invisible pour le front, supabase-js et n8n (erreur "permission denied"). Les tables existantes ne sont pas concernées.
+
+Toute migration qui crée une table (écrite par Claude, Lovable ou à la main) doit contenir, dans la même migration :
+```sql
+alter table public.ma_table enable row level security;
+grant select, insert, update, delete on public.ma_table to authenticated;
+grant select, insert, update, delete on public.ma_table to service_role;
+-- uniquement si la table doit être lisible sans connexion :
+grant select on public.ma_table to anon;
+```
+Le `GRANT` ouvre la porte de la table, la RLS filtre les lignes : les deux sont nécessaires. Vérifier ce point dans toute migration générée par Lovable.
