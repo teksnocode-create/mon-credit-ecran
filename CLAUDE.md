@@ -71,3 +71,13 @@ grant select, insert, update, delete on public.ma_table to service_role;
 grant select on public.ma_table to anon;
 ```
 Le `GRANT` ouvre la porte de la table, la RLS filtre les lignes : les deux sont nécessaires. Vérifier ce point dans toute migration générée par Lovable.
+
+## Pilotage
+- **ROADMAP.md** : état d'avancement par phases, source de vérité
+- **LOGBOOK.md** : journal chronologique des sessions, append-only
+
+## Mots-clés projet
+- `open` : reprise de session, voir `.claude/skills/open/SKILL.md`
+- `log` : snapshot de la conversation dans LOGBOOK.md, voir `.claude/skills/log/SKILL.md`
+- `close` : clôture, commit, push uniquement sur le oui de Nicolas, voir `.claude/skills/close/SKILL.md`
+- `relais` : passage de témoin vers une nouvelle fenêtre, skill global `~/.claude/skills/relais/SKILL.md`
