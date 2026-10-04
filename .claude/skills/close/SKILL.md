@@ -13,11 +13,21 @@ Produire le bilan à partir de la conversation et du `git diff`, puis le soumett
 
 Trois blocs : **fait aujourd'hui**, **en cours / points ouverts**, **bloqué, en attente de quelqu'un**. Puis une seule question : « Tu as autre chose à ajouter ? »
 
+## Étape 1 bis : contrôle du code
+Si la session a modifié du code (pas seulement de la doc), lancer `/code-review` sur le diff avant d'écrire le LOGBOOK.
+- Bug confirmé : le corriger maintenant, ou le reporter dans « points ouverts » avec la raison
+- Rien trouvé : le dire en une ligne
+- Aucun code modifié : sauter l'étape et le dire
+
+Une session ne se ferme pas avec un bug connu qui n'est écrit nulle part.
+
 ## Étape 2 : écrire dans `LOGBOOK.md`
 Une entrée par session, append-only, jamais de réécriture d'une entrée passée. Si `/log` a déjà écrit l'entrée du jour, la compléter au lieu d'en créer une deuxième.
 
 ## Étape 3 : mettre à jour `ROADMAP.md`
 Cocher ce qui est livré avec une preuve. Ajouter ce qui est apparu en cours de route. Si une feature sort du périmètre, la déplacer en « Hors scope » avec la raison, ne pas la supprimer. Mettre à jour la date en tête.
+
+Puis signaler les écarts entre la session et la roadmap, une ligne chacun : travail fait hors de toute phase, feature cochée sans test en conditions réelles, phase en cours qui n'a pas avancé.
 
 ## Étape 4 : contrôle de ce qui part sur GitHub
 `git status -s`, puis vérifier ligne par ligne dans le diff :
@@ -35,6 +45,8 @@ Si la session touche à l'auth Supabase, aux politiques RLS, aux tables ou aux d
 - RLS filtrée sur `auth.uid()` sur les 5 tables (`profiles`, `children`, `missions`, `malus`, `rewards`)
 - `npm run build` doit passer avant tout push
 Reporter les points non traités avec leur raison.
+
+Dans ces mêmes cas, lancer aussi `/security-review` sur les changements et lire les advisors sécurité Supabase du projet (tables sans RLS, policies trop larges). Avant une mise en production, lancer `/qa` sur le parcours principal. Ces contrôles ne se sautent pas en silence : s'ils ne s'appliquent pas, le dire.
 
 ## Étape 6 : commit, puis push sur accord
 1. `git add` ciblé sur les fichiers de la session (jamais `git add .` à l'aveugle), puis commit avec un message factuel en français
